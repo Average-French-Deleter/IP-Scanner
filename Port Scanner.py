@@ -1,14 +1,10 @@
-import sys
 import socket
 from datetime import datetime
-import errno
 import os
 import time
 import threading
 import requests
-import subprocess
 import uuid
-import struct
 
 first = 1
 ptotal = 0
@@ -190,7 +186,7 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
     sock.settimeout(1)
     
     #Sends an emptry packet to the IP and gets the 
-    sock.sendto(b'', (target_ip, 1))
+    sock.sendto(b'', (target, 1))
     packet, _ = sock.recvfrom(2000)
     ttl = packet[8]
     if ttl is None:
@@ -204,7 +200,7 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
     else:
       print ("\033[31mCan't Find OS\033[0m")
   except Exception as e:
-    print(f"\033[31m\n{e}\033[0m")
+    print(f"\033[31m{e}\033[0m")
     pass
 
 
