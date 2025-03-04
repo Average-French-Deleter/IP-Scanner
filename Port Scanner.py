@@ -8,6 +8,7 @@ import threading
 import requests
 import subprocess
 import uuid
+import struct
 
 first = 1
 ptotal = 0
@@ -49,6 +50,15 @@ summary = input("\nCreate File? (Y/N)")
 while summary.lower() not in ["y", "yes", "n", "no"]:
   print("\nCan't recognise an answer, please input correctly.")
   summary = input("Create File? (Y/N)")
+
+title()
+
+print ("Do you want to fingerprint the OS of the selected IP?")
+print ("This will require administrator/root as it creates raw ports.")
+fingerprint = input("\nFingerprint OS? (Y/N)")
+while fingerprint.lower() not in ["y", "yes", "n", "no"]:
+  print("\nCan't recognise an answer, please input correctly.")
+  fingerprint = input("Fingerprint OS? (Y/N)")
 
 title()
 
@@ -171,9 +181,34 @@ def infoGrab(target,local,f,summary):
     except:
       print (f"\033[31mCouldn't Contact Network Interface\033[0m") #Probably means the IP is down
   
+  
+def osFingerprint(): #This one needs admin to use because of raw sockets
+  print ("\nFingerprinting OS With TTL")
+  try:
+    #Makes a raw socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+    sock.settimeout(1)
+    
+    #Sends an emptry packet to the IP and gets the 
+    sock.sendto(b'', (target_ip, 1))
+    packet, _ = sock.recvfrom(2000)
+    ttl = packet[8]
+    if ttl is None:
+        print ("\033[31mCan't Find OS\033[0m")
+    elif ttl <= 64:
+        print ("\033[32mSuspected OS: Linux/Unix\033[0m")
+    elif ttl == 128:
+        print ("\033[32mSuspected OS: Windows\033[0m")
+    elif ttl == 255:
+        print ("\033[32mSuspected OS: MacOS\033[0m")
+    else:
+      print ("\033[31mCan't Find OS\033[0m")
+  except Exception as e:
+    print(f"\033[31m\n{e}\033[0m")
+    pass
+
 
 #Three way handshake (two way if steath mode is on)
-
 def portScan(port,f,summary):
 
   global ptotal, btotal, first
@@ -236,6 +271,9 @@ threads = []
 start = (datetime.now().replace(microsecond=0,hour=0)) #Used to give total time at end of scan
 
 infoGrab(target,local,f,summary)
+
+if fingerprint in ["y", "yes"]:
+  osFingerprint()
 
 if local == 0:
   print (f"\nEstablishing Connection To Ports\033[0m")
