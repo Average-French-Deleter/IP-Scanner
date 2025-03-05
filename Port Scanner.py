@@ -214,12 +214,20 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
     
     if ttl <= 64:
       print ("\033[32mSuspected OS: Linux/Unix\033[0m")
+      if summary.lower() in ["y", "yes"]:
+        f.write (f"Suspected OS: Linux/Unix\n\n")
     elif 64 < ttl <= 128:
       print ("\033[32mSuspected OS: Windows\033[0m")
+      if summary.lower() in ["y", "yes"]:
+        f.write (f"Suspected OS: Windows\n\n")
     elif ttl > 200:
       print ("\033[32mSuspected OS: MacOS\033[0m")
+      if summary.lower() in ["y", "yes"]:
+        f.write (f"Suspected OS: MacOS\n\n")
     elif 128 < ttl <= 200:
       print ("\033[32mSuspected OS: Custom / Imbeded System\033[0m")
+      if summary.lower() in ["y", "yes"]:
+        f.write (f"Suspected OS: Custom / Imbeded System\n\n")
     else:
       print ("\033[31mCan't Find OS\033[0m")
   except PermissionError:
