@@ -5,6 +5,7 @@ import time
 import threading
 import requests
 import uuid
+import struct
 
 first = 1
 ptotal = 0
@@ -12,6 +13,7 @@ btotal = 0
 local = 0
 noGeo = 0
 f = 0
+overwrite = "y"
 lock = threading.Lock() #Makes all those above variables work with threading
 
 #There was a bug where os.system would clear things infront of it in title(), the sleep line seems to fix it
@@ -49,15 +51,6 @@ while summary.lower() not in ["y", "yes", "n", "no"]:
 
 title()
 
-print ("Do you want to fingerprint the OS of the selected IP?")
-print ("This will require administrator/root as it creates raw ports.")
-fingerprint = input("\nFingerprint OS? (Y/N)")
-while fingerprint.lower() not in ["y", "yes", "n", "no"]:
-  print("\nCan't recognise an answer, please input correctly.")
-  fingerprint = input("Fingerprint OS? (Y/N)")
-
-title()
-
 print("Info:\nThis scanner uses IPv4, if you're not sure if you have a v4 or v6 IP, then it's probably a v4.")
 print("The intended purpose is for education and to be used with personally owned IPs.")
 print("Unauthorised use of this tool on someone elses IP is not condoned and is your responsibility.")
@@ -75,6 +68,9 @@ if summary.lower() in ["y", "yes"]:
   if f"{target} Scan Results.txt" in os.listdir():
     print (f"\nThere is already a file made for {target}, would you like to overwrite it?")
     overwrite = input("Overwrite File? (Y/N)")
+    while overwrite.lower() not in ["y", "yes", "n", "no"]:
+      print("\nCan't recognise an answer, please input correctly.")
+      overwrite = input("Overwrite File? (Y/N)")
     if overwrite.lower() in ["y", "yes"]:
       with open (f"{target} Scan Results.txt", "w"):
         pass
@@ -177,6 +173,26 @@ def infoGrab(target,local,f,summary):
     except:
       print (f"\033[31mCouldn't Contact Network Interface\033[0m") #Probably means the IP is down
   
+def checkSum(data):
+  #Computes ICMP 
+  sum = 0
+  countTo = (len(data) // 2) * 2
+  count = 0
+
+  while count < countTo:
+    thisVal = data[count + 1] * 256 + data[count]
+    sum = sum + thisVal
+    sum = sum & 0xffffffff
+    count = count + 2
+
+  if countTo < len(data):
+    sum = sum + data[-1]
+    sum = sum & 0xffffffff
+
+  sum = (sum >> 16) + (sum & 0xffff)
+  sum = sum + (sum >> 16)
+  answer = ~sum & 0xffff
+  return answer >> 8 | (answer << 8 & 0xff00)
   
 def osFingerprint(): #This one needs admin to use because of raw sockets
   print ("\nFingerprinting OS With TTL")
@@ -185,26 +201,36 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
     sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
     sock.settimeout(1)
     
-    #Sends an emptry packet to the IP and gets the 
-    sock.sendto(b'', (target, 1))
+    dummy = struct.pack('!BBHHH', 8, 0, 0, 12345, 1) #Makes a dummy header to format the header with the BBHHH
+    cheksum = checkSum(dummy+b'HIIII :3') #Uses the dummy to get the correct checksum with a payload to send out
+    icmpPacket = struct.pack('!BBHHH', 8, 0, cheksum, 12345, 1)+b'HIIII :3' #The actual packet that will be sent
+    
+        
+    #Sends the packet to the IP and gets the response
+    sock.sendto(icmpPacket, (target, 1))
     packet, _ = sock.recvfrom(2000)
+    
     ttl = packet[8]
-    if ttl is None:
-        print ("\033[31mCan't Find OS\033[0m")
-    elif ttl <= 64:
-        print ("\033[32mSuspected OS: Linux/Unix\033[0m")
-    elif ttl == 128:
-        print ("\033[32mSuspected OS: Windows\033[0m")
-    elif ttl == 255:
-        print ("\033[32mSuspected OS: MacOS\033[0m")
+    
+    if ttl <= 64:
+      print ("\033[32mSuspected OS: Linux/Unix\033[0m")
+    elif 64 < ttl <= 128:
+      print ("\033[32mSuspected OS: Windows\033[0m")
+    elif ttl > 200:
+      print ("\033[32mSuspected OS: MacOS\033[0m")
+    elif 128 < ttl <= 200:
+      print ("\033[32mSuspected OS: Custom / Imbeded System\033[0m")
     else:
       print ("\033[31mCan't Find OS\033[0m")
+  except PermissionError:
+    print ("\033[31mNot Running With Admin Privilges\033[0m")
   except Exception as e:
     print(f"\033[31m{e}\033[0m")
     pass
 
 
 #Three way handshake (two way if steath mode is on)
+
 def portScan(port,f,summary):
 
   global ptotal, btotal, first
@@ -268,8 +294,7 @@ start = (datetime.now().replace(microsecond=0,hour=0)) #Used to give total time 
 
 infoGrab(target,local,f,summary)
 
-if fingerprint in ["y", "yes"]:
-  osFingerprint()
+osFingerprint()
 
 if local == 0:
   print (f"\nEstablishing Connection To Ports\033[0m")
