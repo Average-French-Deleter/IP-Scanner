@@ -242,7 +242,7 @@ def whoisLookup(target,server):
     
 def whoisRemove(result):#Removes data that doesn't give anything usefull
 
-  finds = ("clientTransferProhibited", "database contains", "REDACTED", "unsigned", "Domain Name", "URL of the ICANN", "Please query", "Last update", "For more information", "Terms of Use")#Thing to delete
+  finds = ("clientTransferProhibited", "Nominet", "domain names", "database contains", "REDACTED", "unsigned", "Domain Name", "URL of the ICANN", "Please query", "Last update", "For more information", "Terms of Use")#Thing to delete
   lines = result.split("\n")#Seperates lines
 
   while any(find in line for line in lines for find in finds):#Loops through every line
@@ -257,6 +257,8 @@ def whoisRemove(result):#Removes data that doesn't give anything usefull
       skip = 22
     elif "NOTICE" in line:
       skip = 6
+    elif "You may not" in line:
+      skip = 7
     else:
       filteredLines.append(line)
   lines = filteredLines
