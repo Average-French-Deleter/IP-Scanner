@@ -242,12 +242,26 @@ def whoisLookup(target,server):
     
 def whoisRemove(result):#Removes data that doesn't give anything usefull
 
-  finds = ("REDACTED", "unsigned", "Domain Name", "URL of the ICANN", "Please query", "Last update", "For more information", "Terms of Use")#Thing to delete
+  finds = ("clientTransferProhibited", "database contains", "REDACTED", "unsigned", "Domain Name", "URL of the ICANN", "Please query", "Last update", "For more information", "Terms of Use")#Thing to delete
   lines = result.split("\n")#Seperates lines
-  #Splits server into lines, removes lines with REDACTED in and puts it back together
-  while any(find in line for line in lines for find in finds):
-    lines = [line for line in lines if not any (find in line for find in finds)]
-  data = "\n".join(lines)
+
+  while any(find in line for line in lines for find in finds):#Loops through every line
+    lines = [line for line in lines if not any (find in line for find in finds)]#Checks for the wanted phrases
+  
+  filteredLines = []
+  skip = 0
+  for line in lines:
+    if skip > 0:#This will never return true if terms of use isn't found
+      skip -= 1
+    elif "TERMS OF USE" in line:
+      skip = 22
+    elif "NOTICE" in line:
+      skip = 6
+    else:
+      filteredLines.append(line)
+  lines = filteredLines
+
+  data = "\n".join(lines)#Makes it human readable again
   return (data)
   
 def checkSum(data):
