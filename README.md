@@ -3,5 +3,5 @@ Lil project I'm working on, basically just a baby version of nmap. It's not supp
 
 Stuff to still do:
 - [x] Write to an external file (allow user to choose if they want it to)
-- [ ] Check for OSs running and their versions
+- [x] Check for OSs running and their versions
 - [ ] Add a whois lookup
