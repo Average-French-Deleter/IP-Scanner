@@ -6,6 +6,8 @@ import threading
 import requests
 import uuid
 import struct
+import re
+import subprocess
 
 first = 1
 ptotal = 0
@@ -14,6 +16,7 @@ local = 0
 noGeo = 0
 f = 0
 overwrite = "y"
+ip = 0
 lock = threading.Lock() #Makes all those above variables work with threading
 
 #There was a bug where os.system would clear things infront of it in title(), the sleep line seems to fix it
@@ -29,7 +32,6 @@ def title():
   print ("\033[0m")
 
 title()
-
 
 print ("This tool gives info about entered IPs like DNS, ISP, and open ports with their banners.\n")
 print ("Do you want to use a stealth scan?")
@@ -60,6 +62,7 @@ if stealth.lower() in ["n" or "no"]:
 print ("(ctrl+c won't work because of multi threading, just wait for it to finish)")
 
 target = input(str("\n\n\033[32mIP/Domain To Scan:\033[0m"))
+target = target.lower()
 
 if target == "" or target == "127.0.0.1" or target == "localhost":
   local = 1
@@ -82,11 +85,12 @@ if summary.lower() in ["y", "yes"]:
   if overwrite.lower() in ["n", "no"]:
     f.write ("\nDuplicate Scan:\n\n")
 
-#Signiling start of scan to user and some statistics
+if target.count(".") != 3: #Checks if it's not an ip
+  ip = socket.gethostbyname(target)
+else:
+  ip = 0
 
-def infoGrab(target,local,f,summary):
-  
-  #This still doesn't write to the text file properly when it's suppsoed to
+def infoGrab(target,local,f,summary,ip):
   
   if local == 1:
     print ("\n\033[35m- Scan Start -\033[0m")
@@ -99,7 +103,6 @@ def infoGrab(target,local,f,summary):
   
     print (f"Scanning \033[34m{target}\033[0m")
     if target.count(".") != 3: #Checks if it's not an ip
-      ip = socket.gethostbyname(target)
       print (f"IP: \033[34m{ip}\033[0m")
       if summary.lower() in ["y", "yes"]:
         f.write (f"IP: {ip}\n\n")
@@ -131,7 +134,7 @@ def infoGrab(target,local,f,summary):
       else:
         print ("\033[31mNo ISP Found\033[0m")
     except:
-      print ("\033[31mCouldn't Check For ISP\033[0m") 
+      print ("\033[31mCouldn't Check For ISP\033[0m")
       
     print ("\nSearching For Server Geolocation")
     try:
@@ -173,8 +176,82 @@ def infoGrab(target,local,f,summary):
     except:
       print (f"\033[31mCouldn't Contact Network Interface\033[0m") #Probably means the IP is down
   
+def whoisServer(target,ip):
+  #Uses a list to be more efficient than a ton of elif statements
+  if target.count(".") != 3: #Checks if it's not an ip
+    ip = socket.gethostbyname(target)
+  else:
+    ip = 0
+  if ip != 0:
+    whoisServers = {
+      ".com": "whois.verisign-grs.com",
+      ".net": "whois.verisign-grs.com",
+      ".org": "whois.pir.org",
+      ".info": "whois.afilias.net",
+      ".biz": "whois.nic.biz",
+      ".name": "whois.nic.name",
+      ".pro": "whois.registrypro.pro",
+      ".mobi": "whois.dotmobiregistry.net",
+      ".asia": "whois.nic.asia",
+      ".us": "whois.nic.us",
+      ".uk": "whois.nic.uk",
+      ".ca": "whois.cira.ca",
+      ".au": "whois.auda.org.au",
+      ".de": "whois.denic.de",
+      ".fr": "whois.nic.fr",
+      ".in": "whois.registry.in",
+      ".jp": "whois.jprs.jp",
+      ".cn": "whois.cnnic.cn",
+      ".br": "whois.registro.br",
+      ".ru": "whois.tcinet.ru"
+    }
+    for tld, server in whoisServers.items():
+      if re.search(rf"{tld}$", target):  # Match TLDs properly
+        return server
+    #Don't need an else because you're using return
+    return "No Result"
+  else:
+    return ("NIP")
+
+
+  
+def whoisLookup(target,server):
+  try:
+    #Connects to the port used for lookups
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(10)
+    sock.connect((server, 43))#This just doesn't work on trinket
+    
+    #Sends the domain to the port as bytes
+    query = target + "\r\n"
+    sock.sendall(query.encode())
+    #Recieves the response as bytes
+    response = b""
+    while True: #Repeats until a response is given
+      data = sock.recv(4000)
+      if not data:
+        break
+      response += data
+    sock.close()
+    return response.decode()
+  except socket.timeout:
+    print("\033[31mTimeout While Recieving Data\033[0m")
+  except Exception as e:
+    print(f"\033[31m{e}\033[0m")
+    
+    
+def whoisRemove(result):#Removes data that doesn't give anything usefull
+
+  finds = ("REDACTED", "unsigned", "Domain Name", "URL of the ICANN", "Please query", "Last update", "For more information", "Terms of Use")#Thing to delete
+  lines = result.split("\n")#Seperates lines
+  #Splits server into lines, removes lines with REDACTED in and puts it back together
+  while any(find in line for line in lines for find in finds):
+    lines = [line for line in lines if not any (find in line for find in finds)]
+  data = "\n".join(lines)
+  return (data)
+  
 def checkSum(data):
-  #Computes ICMP 
+  #I still don't fully understand this, but I know it makes the code work so it's here
   sum = 0
   countTo = (len(data) // 2) * 2
   count = 0
@@ -208,6 +285,7 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
         
     #Sends the packet to the IP and gets the response
     sock.sendto(icmpPacket, (target, 1))
+    sock.settimeout(5)
     packet, _ = sock.recvfrom(2000)
     
     ttl = packet[8]
@@ -232,9 +310,10 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
       print ("\033[31mCan't Find OS\033[0m")
   except PermissionError:
     print ("\033[31mNot Running With Admin Privilges\033[0m")
+  except socket.timeout:
+    print ("\033[31mTimeout\033[0m")
   except Exception as e:
     print(f"\033[31m{e}\033[0m")
-    pass
 
 
 #Three way handshake (two way if steath mode is on)
@@ -300,9 +379,29 @@ threads = []
 
 start = (datetime.now().replace(microsecond=0,hour=0)) #Used to give total time at end of scan
 
-infoGrab(target,local,f,summary)
+infoGrab(target,local,f,summary,ip)
 
 osFingerprint()
+
+print ("\nGetting WHOIS Lookup")
+
+server = (whoisServer(target,ip))
+
+if server is None:
+  print ("\033[31mCan't Find Server To Contact\033[0m")
+elif server == "NIP":
+  print ("\033[31mCannot Get IP To Lookup\033[0m")
+elif server != "No Result":
+  result = whoisLookup(target,server)
+  if result != None:
+    whois = (whoisRemove(result))
+    print (f"\033[32m{whois}\033[0m")
+    print("\033[F\033[F\033[F\033[F")
+    if summary.lower() in ["y", "yes"]:
+      f.write("WhoIs Lookup:\n")
+      f.write(whois)
+else:
+  print ("\033[31mCan't Contact Server\033[0m")
 
 if local == 0:
   print (f"\nEstablishing Connection To Ports\033[0m")
@@ -338,4 +437,3 @@ if length.seconds // 60 >= 1:
     print (f"\nScan took {length.seconds // 60} minutes and {length.seconds % 60} seconds.")
 else:
   print (f"\nScan took {length.seconds} seconds.")
-  
