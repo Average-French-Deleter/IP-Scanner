@@ -121,9 +121,9 @@ def infoGrab(target,local,f,summary,ip):
     
     print ("Searching For ISP")
     if ip == 0:
-      url = (f"https://ipinfo.io/{target}/json") #Site for info on IPs
+      url = (f"https://ipinfo.io/{target}/json") #Option for raw IPs
     else:
-      url = (f"https://ipinfo.io/{ip}/json") #The site won't work with domains so if a domain is entered it uses the IP gotten earlier
+      url = (f"https://ipinfo.io/{ip}/json") #Option for websites
     try:
       respond = requests.get(url)
       isp = respond.json() #Converts json into something readable by python
@@ -131,6 +131,8 @@ def infoGrab(target,local,f,summary,ip):
         print (f"\033[32mISP Found: {isp['org']}\033[0m")
         if summary.lower() in ["y", "yes"]:
           f.write (f"ISP: {isp['org']}\n\n")
+      elif "bogon" in isp:
+        print ("\033[31mIP Entered Is Private\033[0m")
       else:
         print ("\033[31mNo ISP Found\033[0m")
     except:
@@ -139,14 +141,17 @@ def infoGrab(target,local,f,summary,ip):
     print ("\nSearching For Server Geolocation")
     try:
       respond = requests.get(url) #Uses the same site as for ISP
-      geolocation = respond.json()  # Converts JSON into something readable by Python
+      if "bogon" in isp:
+        print ("\033[31mIP Entered Is Private\033[0m")
+      geolocation = respond.json() #Converts JSON into something readable by Python
       if "country" in geolocation:
         print(f"\033[32mCountry: {geolocation['country']}\033[0m")
         if summary.lower() in ["y", "yes"]:
           f.write (f"Country Of Server: {geolocation['country']}\n")
       else:
         noGeo = 1
-        print (f"\033[31mCan't Find Geolocation\033[0m")
+        if "bogon" not in isp:
+          print (f"\033[31mCan't Find Geolocation\033[0m")
       if "city" in geolocation:
         print(f"\033[32mCity: {geolocation['city']}\033[0m")
         if summary.lower() in ["y", "yes"]:
@@ -162,7 +167,8 @@ def infoGrab(target,local,f,summary,ip):
         print("\033[31mRegion information not found\033[0m")
         noGeo = 1
     except:
-      print ("\033[31mCouldn't Check For Geolocation\033[0m")
+      if "bogon" not in isp:
+        print ("\033[31mCouldn't Check For Geolocation\033[0m")
         
     print ("\nRetrieving MAC Address From Network Interface")
     try:
@@ -220,7 +226,7 @@ def whoisLookup(target,server):
     #Connects to the port used for lookups
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(10)
-    sock.connect((server, 43))#This just doesn't work on trinket
+    sock.connect((server, 43))
     
     #Sends the domain to the port as bytes
     query = target + "\r\n"
@@ -251,7 +257,7 @@ def whoisRemove(result):#Removes data that doesn't give anything usefull
   filteredLines = []
   skip = 0
   for line in lines:
-    if skip > 0:#This will never return true if terms of use isn't found
+    if skip > 0:#This will never return true the following arent found
       skip -= 1
     elif "TERMS OF USE" in line:
       skip = 22
@@ -333,7 +339,6 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
 
 
 #Three way handshake (two way if steath mode is on)
-
 def portScan(port,f,summary):
 
   global ptotal, btotal, first
@@ -346,10 +351,10 @@ def portScan(port,f,summary):
 
     #Checks if the retrieved port is open
     result = sock.connect_ex((target,port))
-    if first == 1 and local == 0:
-      with lock: #Needs to use lock because of multi threading, same thing happens later too
-        print ("\033[32mConnection Established, Checking Ports\033[0m\n")
+    with lock:#Needs to use lock because of multi threading, same thing happens later too
+      if first == 1 and local == 0:
         first = 0
+        print ("\033[32mConnection Established, Checking Ports\033[0m\n")
     
     #Gets all the info from any open ports that it finds  
     if result == 0: #0 indicates an open port
