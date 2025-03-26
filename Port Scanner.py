@@ -90,98 +90,92 @@ if target.count(".") != 3: #Checks if it's not an ip
 else:
   ip = 0
 
+def checkTarget(target):
+  print ("\n\033[35m- Scan Start -\033[0m")
+  print (f"Time Of Scan: {str(datetime.now().replace(microsecond=0))}")
+  print (f"Scanning \033[34m{target}\033[0m")
+  if ip != 0:
+    print (f"IP: \033[34m{ip}\033[0m")
+    if summary.lower() in ["y", "yes"]:
+      f.write (f"IP: {ip}\n\n")
+
+
+def dnsLookup(target):
+  print (f"\nAttempting Reverse DNS Lookup")
+  try:
+    dns = socket.gethostbyaddr(target)[0] #Makes a request to the IP for a DNS
+    print (f"\033[32mDNS Found: {dns}\033[0m\n")
+    if summary.lower() in ["y", "yes"]:
+      f.write (f"DNS: {dns}\n\n")
+  except:
+    print ("\033[31mCouldn't Find DNS\033[0m\n")
+
+
 def infoGrab(target,local,f,summary,ip):
-  
-  if local == 1:
-    print ("\n\033[35m- Scan Start -\033[0m")
-    print (f"Time Of Scan: {str(datetime.now().replace(microsecond=0))}")
-    print ("\nScanning Local Host Ports\n")
-  
+
+  print ("Searching For ISP")
+  if ip == 0:
+    url = (f"https://ipinfo.io/{target}/json") #Option for raw IPs
   else:
-    print ("\n\033[35m- Scan Start -\033[0m")
-    print (f"Time Of Scan: {str(datetime.now().replace(microsecond=0))}")
-  
-    print (f"Scanning \033[34m{target}\033[0m")
-    if target.count(".") != 3: #Checks if it's not an ip
-      print (f"IP: \033[34m{ip}\033[0m")
+    url = (f"https://ipinfo.io/{ip}/json") #Option for websites
+  try:
+    respond = requests.get(url)
+    isp = respond.json() #Converts json into something readable by python
+    if "org" in isp:
+      print (f"\033[32mISP Found: {isp['org']}\033[0m")
       if summary.lower() in ["y", "yes"]:
-        f.write (f"IP: {ip}\n\n")
+        f.write (f"ISP: {isp['org']}\n\n")
+    elif "bogon" in isp:
+      print ("\033[31mIP Entered Is Private\033[0m")
     else:
-      ip = 0
-      
-  
-    print (f"\nAttempting Reverse DNS Lookup")
-    try:
-      dns = socket.gethostbyaddr(target)[0] #Makes a request to the IP for a DNS
-      print (f"\033[32mDNS Found: {dns}\033[0m\n")
+      print ("\033[31mNo ISP Found\033[0m")
+  except:
+    print ("\033[31mCouldn't Check For ISP\033[0m")
+
+
+  print ("\nSearching For Server Geolocation")
+  try:
+    respond = requests.get(url) #Uses the same site as for ISP
+    if "bogon" in isp:
+      print ("\033[31mIP Entered Is Private\033[0m")
+    geolocation = respond.json() #Converts JSON into something readable by Python
+    if "country" in geolocation:
+      print(f"\033[32mCountry: {geolocation['country']}\033[0m")
       if summary.lower() in ["y", "yes"]:
-        f.write (f"DNS: {dns}\n\n")
-    except:
-      print ("\033[31mCouldn't Find DNS\033[0m\n")
-    
-    print ("Searching For ISP")
-    if ip == 0:
-      url = (f"https://ipinfo.io/{target}/json") #Option for raw IPs
+        f.write (f"Country Of Server: {geolocation['country']}\n")
     else:
-      url = (f"https://ipinfo.io/{ip}/json") #Option for websites
-    try:
-      respond = requests.get(url)
-      isp = respond.json() #Converts json into something readable by python
-      if "org" in isp:
-        print (f"\033[32mISP Found: {isp['org']}\033[0m")
-        if summary.lower() in ["y", "yes"]:
-          f.write (f"ISP: {isp['org']}\n\n")
-      elif "bogon" in isp:
-        print ("\033[31mIP Entered Is Private\033[0m")
-      else:
-        print ("\033[31mNo ISP Found\033[0m")
-    except:
-      print ("\033[31mCouldn't Check For ISP\033[0m")
-      
-    print ("\nSearching For Server Geolocation")
-    try:
-      respond = requests.get(url) #Uses the same site as for ISP
-      if "bogon" in isp:
-        print ("\033[31mIP Entered Is Private\033[0m")
-      geolocation = respond.json() #Converts JSON into something readable by Python
-      if "country" in geolocation:
-        print(f"\033[32mCountry: {geolocation['country']}\033[0m")
-        if summary.lower() in ["y", "yes"]:
-          f.write (f"Country Of Server: {geolocation['country']}\n")
-      else:
-        noGeo = 1
-        if "bogon" not in isp:
-          print (f"\033[31mCan't Find Geolocation\033[0m")
-      if "city" in geolocation:
-        print(f"\033[32mCity: {geolocation['city']}\033[0m")
-        if summary.lower() in ["y", "yes"]:
-          f.write (f"City Of Server: {geolocation['city']}\n")
-      elif noGeo == 0:
-        print("\033[31mCity information not found\033[0m")
-        noGeo = 1
-      if "region" in geolocation:
-        print(f"\033[32mRegion: {geolocation['region']}\033[0m")
-        if summary.lower() in ["y", "yes"]:
-          f.write (f"Region Of Server: {geolocation['region']}\n\n")
-      elif noGeo == 0:
-        print("\033[31mRegion information not found\033[0m")
-        noGeo = 1
-    except:
+      noGeo = 1
       if "bogon" not in isp:
-        print ("\033[31mCouldn't Check For Geolocation\033[0m")
-        
-    print ("\nRetrieving MAC Address From Network Interface")
-    try:
-      mac =':'.join(f'{(uuid.getnode() >> i) & 0xff:02x}' for i in range(0, 48, 8))
-      if mac:
-        print (f"\033[32mMAC Address Found: {mac}\033[0m")
-        if summary.lower() in ["y", "yes"]:
-            f.write (f"MAC Address: {mac}\n\n")
-      else:
-        print (f"\033[31mCouldn't Find MAC Address\033[0m")
-    except:
-      print (f"\033[31mCouldn't Contact Network Interface\033[0m") #Probably means the IP is down
-  
+        print (f"\033[31mCan't Find Geolocation\033[0m")
+    if "city" in geolocation:
+      print(f"\033[32mCity: {geolocation['city']}\033[0m")
+      if summary.lower() in ["y", "yes"]:
+        f.write (f"City Of Server: {geolocation['city']}\n")
+    elif noGeo == 0:
+      print("\033[31mCity information not found\033[0m")
+      noGeo = 1
+    if "region" in geolocation:
+      print(f"\033[32mRegion: {geolocation['region']}\033[0m")
+      if summary.lower() in ["y", "yes"]:
+        f.write (f"Region Of Server: {geolocation['region']}\n\n")
+    elif noGeo == 0:
+      print("\033[31mRegion information not found\033[0m")
+  except:
+    if "bogon" not in isp:
+      print ("\033[31mCouldn't Check For Geolocation\033[0m")
+
+  print ("\nRetrieving MAC Address From Network Interface")
+  try:
+    mac =':'.join(f'{(uuid.getnode() >> i) & 0xff:02x}' for i in range(0, 48, 8))
+    if mac:
+      print (f"\033[32mMAC Address Found: {mac}\033[0m")
+      if summary.lower() in ["y", "yes"]:
+        f.write (f"MAC Address: {mac}\n\n")
+    else:
+      print (f"\033[31mCouldn't Find MAC Address\033[0m")
+  except:
+    print (f"\033[31mCouldn't Contact Network Interface\033[0m") #Probably means the IP is down
+
 def whoisServer(target,ip):
   #Uses a list to be more efficient than a ton of elif statements
   if target.count(".") != 3: #Checks if it's not an ip
@@ -220,14 +214,13 @@ def whoisServer(target,ip):
     return ("NIP")
 
 
-  
 def whoisLookup(target,server):
   try:
     #Connects to the port used for lookups
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(10)
     sock.connect((server, 43))
-    
+
     #Sends the domain to the port as bytes
     query = target + "\r\n"
     sock.sendall(query.encode())
@@ -244,16 +237,16 @@ def whoisLookup(target,server):
     print("\033[31mTimeout While Recieving Data\033[0m")
   except Exception as e:
     print(f"\033[31m{e}\033[0m")
-    
-    
+
+
 def whoisRemove(result):#Removes data that doesn't give anything usefull
 
-  finds = ("clientTransferProhibited", "Nominet", "domain names", "database contains", "REDACTED", "unsigned", "Domain Name", "URL of the ICANN", "Please query", "Last update", "For more information", "Terms of Use")#Thing to delete
+  finds = ("%", "clientTransferProhibited", "Nominet", "domain names", "database contains", "REDACTED", "unsigned", "Domain Name", "URL of the ICANN", "Please query", "Last update", "For more information", "Terms of Use")#Thing to delete
   lines = result.split("\n")#Seperates lines
 
   while any(find in line for line in lines for find in finds):#Loops through every line
     lines = [line for line in lines if not any (find in line for find in finds)]#Checks for the wanted phrases
-  
+
   filteredLines = []
   skip = 0
   for line in lines:
@@ -265,13 +258,15 @@ def whoisRemove(result):#Removes data that doesn't give anything usefull
       skip = 6
     elif "You may not" in line:
       skip = 7
+    elif "Identity Digital Australia" in line:
+      skip = 22
     else:
       filteredLines.append(line)
   lines = filteredLines
 
   data = "\n".join(lines)#Makes it human readable again
   return (data)
-  
+
 def checkSum(data):
   #I still don't fully understand this, but I know it makes the code work so it's here
   sum = 0
@@ -292,44 +287,42 @@ def checkSum(data):
   sum = sum + (sum >> 16)
   answer = ~sum & 0xffff
   return answer >> 8 | (answer << 8 & 0xff00)
-  
-def osFingerprint(): #This one needs admin to use because of raw sockets
+
+def osFingerprint(target): #This one needs admin to use because of raw sockets
   print ("\nFingerprinting OS With TTL")
   try:
     #Makes a raw socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
     sock.settimeout(1)
-    
+
     dummy = struct.pack('!BBHHH', 8, 0, 0, 12345, 1) #Makes a dummy header to format the header with the BBHHH
     cheksum = checkSum(dummy+b'HIIII :3') #Uses the dummy to get the correct checksum with a payload to send out
     icmpPacket = struct.pack('!BBHHH', 8, 0, cheksum, 12345, 1)+b'HIIII :3' #The actual packet that will be sent
-    
-        
+
+
     #Sends the packet to the IP and gets the response
     sock.sendto(icmpPacket, (target, 1))
     sock.settimeout(5)
     packet, _ = sock.recvfrom(2000)
-    
+
     ttl = packet[8]
-    
     if ttl <= 64:
-      print ("\033[32mSuspected OS: Linux/Unix\033[0m")
+      print ("\033[32mSuspected OS: Linux/MacOS\033[0m")
       if summary.lower() in ["y", "yes"]:
-        f.write (f"Suspected OS: Linux/Unix\n\n")
-    elif 64 < ttl <= 128:
+        f.write (f"Suspected OS: Linux/MacOS\n")
+    elif ttl <= 128:
       print ("\033[32mSuspected OS: Windows\033[0m")
       if summary.lower() in ["y", "yes"]:
-        f.write (f"Suspected OS: Windows\n\n")
-    elif ttl > 200:
-      print ("\033[32mSuspected OS: MacOS\033[0m")
+        f.write (f"Suspected OS: Windows\n")
+    elif ttl <= 255:
+      print ("\033[32mSuspected OS: Router\033[0m")
       if summary.lower() in ["y", "yes"]:
-        f.write (f"Suspected OS: MacOS\n\n")
-    elif 128 < ttl <= 200:
-      print ("\033[32mSuspected OS: Custom / Imbeded System\033[0m")
-      if summary.lower() in ["y", "yes"]:
-        f.write (f"Suspected OS: Custom / Imbeded System\n\n")
+        f.write (f"Suspected OS: Router\n")
     else:
       print ("\033[31mCan't Find OS\033[0m")
+    print (f"TTL: {ttl}")
+    if summary.lower() in ["y", "yes"]:
+      f.write (f"TTL: {ttl}\n\n")
   except PermissionError:
     print ("\033[31mNot Running With Admin Privilges\033[0m")
   except socket.timeout:
@@ -340,11 +333,10 @@ def osFingerprint(): #This one needs admin to use because of raw sockets
 
 #Three way handshake (two way if steath mode is on)
 def portScan(port,f,summary):
-
   global ptotal, btotal, first
 
   try:
-  
+
     #Sets up connection to the next port
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(0.5)
@@ -355,8 +347,8 @@ def portScan(port,f,summary):
       if first == 1 and local == 0:
         first = 0
         print ("\033[32mConnection Established, Checking Ports\033[0m\n")
-    
-    #Gets all the info from any open ports that it finds  
+
+    #Gets all the info from any open ports that it finds
     if result == 0: #0 indicates an open port
       with lock:
         ptotal = ptotal + 1
@@ -367,7 +359,7 @@ def portScan(port,f,summary):
         print (f"\033[32m- Port {port} is open -\033[0m\n")
         if summary.lower() in ["y", "yes"]:
           f.write(f"Open Port: {port}\n\n")
-        
+
       if stealth.lower() in ["n", "no"]:
         try:
           sock.settimeout(5)
@@ -400,9 +392,14 @@ threads = []
 
 start = (datetime.now().replace(microsecond=0,hour=0)) #Used to give total time at end of scan
 
+checkTarget(target)
+
+dnsLookup(target)
+
 infoGrab(target,local,f,summary,ip)
 
-osFingerprint()
+osFingerprint(target)
+
 
 print ("\nGetting WHOIS Lookup")
 
@@ -425,7 +422,9 @@ else:
   print ("\033[31mCan't Contact Server\033[0m")
 
 if local == 0:
-  print (f"\nEstablishing Connection To Ports\033[0m")
+  print (f"\nEstablishing Connection To Ports")
+else:
+  print("\nScanning Local Host Ports\n")
 
 for port in range(1,65536):
   thread = threading.Thread(target=portScan, args=(port,f,summary))
@@ -437,7 +436,7 @@ for item in threads:
 
 if summary.lower() in ["y", "yes"]:
   f.close()
-  
+
 #Scan statistics
 if ptotal == 0:
   print("\033[31mCouldn't find any open ports\033[0m")
